@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlgoSuggest</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Custom Animations */
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fade-in 0.4s ease-out forwards;
+        }
+
+        @keyframes glow-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 25px rgba(249, 115, 22, 0.6);
+            }
+        }
+
+        .animate-glow {
+            animation: glow-pulse 3s infinite;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-orange-500/30 selection:text-orange-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Icons
+        const SearchIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-500"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        );
+        const FilmIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+        );
+        const LoaderIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin mr-2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        );
+        const PlayIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-500 ml-auto opacity-0 group-hover:opacity-100 transition-opacity"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+        );
+
+        const AlgoSuggest = () => {
+            const [activeTab, setActiveTab] = useState('title');
+            const [titleInput, setTitleInput] = useState('');
+            const [genreInput, setGenreInput] = useState('Action');
+            const [recommendations, setRecommendations] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            // Autocomplete state
+            const [suggestions, setSuggestions] = useState([]);
+            const [showSuggestions, setShowSuggestions] = useState(false);
+            const wrapperRef = useRef(null);
+
+            // Close suggestions on click outside
+            useEffect(() => {
+                function handleClickOutside(event) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                        setShowSuggestions(false);
+                    }
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [wrapperRef]);
+
+            // Debounced autocomplete fetch
+            useEffect(() => {
+                const timer = setTimeout(async () => {
+                    if (activeTab === 'title' && titleInput.length >= 2) {
+                        try {
+                            const response = await fetch(`http://localhost:5000/api/autocomplete?query=${encodeURIComponent(titleInput)}`);
+                            const data = await response.json();
+                            setSuggestions(data.suggestions || []);
+                            setShowSuggestions(true);
+                        } catch (err) {
+                            console.error("Autocomplete error:", err);
+                        }
+                    } else {
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                    }
+                }, 300); // 300ms debounce
+
+                return () => clearTimeout(timer);
+            }, [titleInput, activeTab]);
+
+            const fetchRecommendations = async (type, input) => {
+                setLoading(true);
+                setError('');
+                setRecommendations([]);
+                setShowSuggestions(false); // Hide suggestions on search
+
+                const endpoint = type === 'title' ? '/api/recommend' : '/api/recommend_genre';
+                const payload = type === 'title' ? { title: input } : { genre: input };
+
+                try {
+                    const response = await fetch(`http://localhost:5000${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        // Use the error message from backend if available
+                        throw new Error(data.error || 'Network response was not ok');
+                    }
+
+                    if (data.error) {
+                        setError(data.error);
+                    } else {
+                        setRecommendations(data.recommendations || []);
+                    }
+                } catch (err) {
+                    console.error("Error fetching recommendations:", err);
+                    setError(err.message || "Failed to connect to backend. Is the Python script running?");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                if (activeTab === 'title' && !titleInput.trim()) return;
+
+                const input = activeTab === 'title' ? titleInput : genreInput;
+                fetchRecommendations(activeTab, input);
+            };
+
+            const handleSuggestionClick = (suggestion) => {
+                setTitleInput(suggestion);
+                setShowSuggestions(false);
+                fetchRecommendations('title', suggestion); // Auto-search on click
+            };
+
+            return (
+                <div className="w-full max-w-md relative z-10">
+                    {/* Glow Effect Behind Card */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-orange-600 to-amber-600 rounded-2xl blur opacity-25 animate-glow transition duration-1000 group-hover:opacity-100"></div>
+
+                    <div className="relative bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-800/50 backdrop-blur-xl">
+                        {/* Header */}
+                        <div className="bg-zinc-900/80 p-8 text-center border-b border-zinc-800/50">
+                            <div className="flex justify-center mb-4 animate-fade-in" style={{ animationDelay: '0ms' }}>
+                                <FilmIcon />
+                            </div>
+                            <h1 className="text-3xl font-bold text-white tracking-tight mb-2 animate-fade-in" style={{ animationDelay: '100ms' }}>
+                                AlgoSuggest
+                            </h1>
+                            <p className="text-zinc-400 text-sm animate-fade-in" style={{ animationDelay: '200ms' }}>
+                                Intelligent Movie Discovery Engine
+                            </p>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex border-b border-zinc-800/50">
+                            <button
+                                onClick={() => setActiveTab('title')}
+                                className={`flex-1 py-4 text-sm font-medium transition-all duration-300 ${activeTab === 'title'
+                                        ? 'text-orange-500 border-b-2 border-orange-500 bg-zinc-800/30'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20'
+                                    }`}
+                            >
+                                By Title
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('genre')}
+                                className={`flex-1 py-4 text-sm font-medium transition-all duration-300 ${activeTab === 'genre'
+                                        ? 'text-orange-500 border-b-2 border-orange-500 bg-zinc-800/30'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20'
+                                    }`}
+                            >
+                                By Genre
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <form onSubmit={handleSearch} className="space-y-6">
+
+                                {activeTab === 'title' ? (
+                                    <div className="relative" ref={wrapperRef}>
+                                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                            <SearchIcon />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={titleInput}
+                                            onChange={(e) => setTitleInput(e.target.value)}
+                                            onFocus={() => titleInput.length >= 2 && setShowSuggestions(true)}
+                                            placeholder="Enter a movie title (e.g., Avatar)"
+                                            className="w-full pl-10 pr-4 py-4 bg-zinc-950/50 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 outline-none text-zinc-100 placeholder-zinc-600 transition-all shadow-inner"
+                                            autoComplete="off"
+                                        />
+
+                                        {/* Autocomplete Dropdown */}
+                                        {showSuggestions && suggestions.length > 0 && (
+                                            <div className="absolute z-20 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fade-in">
+                                                {suggestions.map((s, i) => (
+                                                    <div
+                                                        key={i}
+                                                        onClick={() => handleSuggestionClick(s)}
+                                                        className="px-4 py-3 hover:bg-zinc-800 cursor-pointer text-sm text-zinc-300 hover:text-white transition-colors border-b border-zinc-800/50 last:border-0 flex items-center"
+                                                    >
+                                                        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-3 opacity-0 group-hover:opacity-100"></span>
+                                                        {s}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <select
+                                            value={genreInput}
+                                            onChange={(e) => setGenreInput(e.target.value)}
+                                            className="w-full px-4 py-4 bg-zinc-950/50 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 outline-none text-zinc-100 appearance-none cursor-pointer transition-all shadow-inner"
+                                        >
+                                            <option value="Action">Action</option>
+                                            <option value="Sci-Fi">Sci-Fi</option>
+                                            <option value="Science Fiction">Science Fiction</option>
+                                            <option value="Crime">Crime</option>
+                                            <option value="Animation">Animation</option>
+                                            <option value="Adventure">Adventure</option>
+                                            <option value="Drama">Drama</option>
+                                            <option value="Comedy">Comedy</option>
+                                            <option value="Thriller">Thriller</option>
+                                            <option value="Horror">Horror</option>
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                            <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/20 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center tracking-wide"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <LoaderIcon />
+                                            Analyzing...
+                                        </>
+                                    ) : (
+                                        'Get Recommendations'
+                                    )}
+                                </button>
+                            </form>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center animate-fade-in">
+                                    <p className="font-semibold mb-1">Oops!</p>
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Results */}
+                            <div className="mt-8">
+                                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 ml-1">
+                                    {recommendations.length > 0 ? 'Top Picks For You' : ''}
+                                </h3>
+
+                                <div className="space-y-3">
+                                    {loading ? (
+                                        // Skeleton loading
+                                        [1, 2, 3].map((i) => (
+                                            <div key={i} className="h-14 bg-zinc-800/50 rounded-xl animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+                                        ))
+                                    ) : recommendations.length > 0 ? (
+                                        recommendations.map((rec, index) => (
+                                            <div
+                                                key={index}
+                                                className="group flex items-center p-4 bg-zinc-800/30 hover:bg-zinc-800/80 border border-zinc-800/50 hover:border-orange-500/30 rounded-xl transition-all cursor-pointer animate-fade-in"
+                                                style={{ animationDelay: `${index * 50}ms` }}
+                                            >
+                                                <span className="flex items-center justify-center w-8 h-8 bg-zinc-900 text-orange-500 text-sm font-bold rounded-lg mr-4 border border-zinc-800 group-hover:border-orange-500/50 transition-colors">
+                                                    {index + 1}
+                                                </span>
+                                                <span className="text-zinc-300 font-medium group-hover:text-white transition-colors">
+                                                    {rec}
+                                                </span>
+                                                <PlayIcon />
+                                            </div>
+                                        ))
+                                    ) : (
+                                        !error && (
+                                            <div className="text-center py-10 text-zinc-600 text-sm">
+                                                <div className="mb-2 opacity-20">
+                                                    <FilmIcon />
+                                                </div>
+                                                Start by searching for a title or selecting a genre.
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-zinc-950/30 p-4 text-center border-t border-zinc-800/50">
+                            <p className="text-xs text-zinc-600 font-medium">Powered by AlgoSuggest Engine v2.1</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AlgoSuggest />);
+    </script>
+</body>
+
+</html>
