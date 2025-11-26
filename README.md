@@ -6,7 +6,6 @@
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask)
-![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 
 **An intelligent movie recommendation engine powered by machine learning** ✨
 
